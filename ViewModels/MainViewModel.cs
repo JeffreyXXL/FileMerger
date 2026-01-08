@@ -1,5 +1,5 @@
 ﻿using FileMerger.Models;
-using Microsoft.Win32; // For SaveFileDialog
+using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls; // Added for CheckBox manipulation
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 
@@ -18,6 +18,7 @@ namespace FileMerger.ViewModels
     {
         private string _selectedFolderPath;
         private string _previewContent;
+        private string _fullMergedContent; // Holds the complete text for export
         private FileItem _selectedFile;
         private bool _groupByType;
         private bool _isBusy;
@@ -43,7 +44,14 @@ namespace FileMerger.ViewModels
             set
             {
                 _selectedFile = value;
-                if (value != null) PreviewContent = value.Content;
+                if (value != null)
+                {
+                    // Truncate individual file preview if extremely large
+                    if (value.Content.Length > 20000)
+                        PreviewContent = value.Content.Substring(0, 20000) + "\r\n... [Preview Truncated] ...";
+                    else
+                        PreviewContent = value.Content;
+                }
                 OnPropertyChanged();
             }
         }
@@ -76,7 +84,7 @@ namespace FileMerger.ViewModels
             FilesView = CollectionViewSource.GetDefaultView(Files);
 
             ScanCommand = new RelayCommand(async (o) => await ScanFolderAsync());
-            MergeCommand = new RelayCommand((o) => MergeFiles());
+            MergeCommand = new RelayCommand(async (o) => await MergeFilesAsync());
             ExportCommand = new RelayCommand((o) => ExportMergedContent());
             ToggleGroupCommand = new RelayCommand(ToggleGroup);
         }
@@ -144,19 +152,14 @@ namespace FileMerger.ViewModels
 
         private void ToggleGroup(object parameter)
         {
-            // The CheckBox itself is passed as the parameter
             if (parameter is CheckBox checkBox && checkBox.Tag is string extension)
             {
                 var filesInGroup = Files.Where(f => f.Extension == extension).ToList();
                 if (!filesInGroup.Any()) return;
 
-                // If all are currently selected, we deselect all.
-                // If any are unselected (mixed or none), we select all.
                 bool allSelected = filesInGroup.All(f => f.IsSelected);
                 bool targetState = !allSelected;
 
-                // Explicitly set the CheckBox state to match our target state.
-                // This fixes synchronization issues where the CheckBox toggle might be opposite to the intended logic.
                 checkBox.IsChecked = targetState;
 
                 foreach (var file in filesInGroup)
@@ -166,32 +169,51 @@ namespace FileMerger.ViewModels
             }
         }
 
-        private void MergeFiles()
+        // Optimized Async Merge to prevent UI freeze
+        private async Task MergeFilesAsync()
         {
-            var sb = new StringBuilder();
             var selectedFiles = Files.Where(f => f.IsSelected).ToList();
+            if (selectedFiles.Count == 0) return;
 
-            sb.AppendLine($"--- Merged {selectedFiles.Count} Files ---");
-            sb.AppendLine($"Generated on: {DateTime.Now}");
-            sb.AppendLine("------------------------------------------");
+            IsBusy = true;
+            SelectedFile = null; // Clear individual file selection
 
-            foreach (var file in selectedFiles)
+            await Task.Run(() =>
             {
-                sb.AppendLine("==========================================");
-                sb.AppendLine($"FILE: {file.Name}");
-                sb.AppendLine($"PATH: {file.FullPath}");
-                sb.AppendLine("==========================================");
-                sb.AppendLine(file.Content);
-                sb.AppendLine(""); // Extra spacing between files
+                var sb = new StringBuilder();
+                sb.AppendLine($"--- Merged {selectedFiles.Count} Files ---");
+                sb.AppendLine($"Generated on: {DateTime.Now}");
+                sb.AppendLine("------------------------------------------\r\n");
+
+                foreach (var file in selectedFiles)
+                {
+                    sb.AppendLine("==========================================");
+                    sb.AppendLine($"FILE: {file.Name}");
+                    sb.AppendLine($"PATH: {file.FullPath}");
+                    sb.AppendLine("==========================================");
+                    sb.AppendLine(file.Content);
+                    sb.AppendLine("\r\n");
+                }
+
+                _fullMergedContent = sb.ToString();
+            });
+
+            // On UI Thread: Update Preview with truncated content
+            if (_fullMergedContent.Length > 20000)
+            {
+                PreviewContent = _fullMergedContent.Substring(0, 20000) + "\r\n\r\n... [Preview Truncated for Performance - Full content will be exported] ...";
+            }
+            else
+            {
+                PreviewContent = _fullMergedContent;
             }
 
-            PreviewContent = sb.ToString();
-            SelectedFile = null;
+            IsBusy = false;
         }
 
         private void ExportMergedContent()
         {
-            if (string.IsNullOrEmpty(PreviewContent))
+            if (string.IsNullOrEmpty(_fullMergedContent))
             {
                 MessageBox.Show("Nothing to export. Please merge files first.");
                 return;
@@ -201,7 +223,8 @@ namespace FileMerger.ViewModels
             saveFileDialog.Filter = "Text file (*.txt)|*.txt|All files (*.*)|*.*";
             if (saveFileDialog.ShowDialog() == true)
             {
-                File.WriteAllText(saveFileDialog.FileName, PreviewContent);
+                // Write the full content, not the truncated preview
+                File.WriteAllText(saveFileDialog.FileName, _fullMergedContent);
                 MessageBox.Show("Export Successful!");
             }
         }
