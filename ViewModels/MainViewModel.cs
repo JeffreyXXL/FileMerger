@@ -8,10 +8,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls; // Added for CheckBox manipulation
 using System.Windows.Data;
 using System.Windows.Input;
-// Note: Add reference to System.Windows.Forms for FolderBrowserDialog if needed, 
-// or use Microsoft.WindowsAPICodePack for modern dialogs.
 
 namespace FileMerger.ViewModels
 {
@@ -84,7 +83,6 @@ namespace FileMerger.ViewModels
 
         private async Task ScanFolderAsync()
         {
-            // Ideally, open FolderBrowserDialog here via a Service
             var dialog = new System.Windows.Forms.FolderBrowserDialog();
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
@@ -100,7 +98,6 @@ namespace FileMerger.ViewModels
                         foreach (var filePath in files)
                         {
                             var info = new FileInfo(filePath);
-                            // Simple text check filter (optional)
                             if (IsTextFile(info.Extension))
                             {
                                 string content = "";
@@ -147,15 +144,20 @@ namespace FileMerger.ViewModels
 
         private void ToggleGroup(object parameter)
         {
-            // When grouped, the key (Name) is passed as parameter (e.g., ".cs")
-            if (parameter is string extension)
+            // The CheckBox itself is passed as the parameter
+            if (parameter is CheckBox checkBox && checkBox.Tag is string extension)
             {
                 var filesInGroup = Files.Where(f => f.Extension == extension).ToList();
                 if (!filesInGroup.Any()) return;
 
-                // Logic: If all are currently selected, deselect all. Otherwise, select all.
+                // If all are currently selected, we deselect all.
+                // If any are unselected (mixed or none), we select all.
                 bool allSelected = filesInGroup.All(f => f.IsSelected);
                 bool targetState = !allSelected;
+
+                // Explicitly set the CheckBox state to match our target state.
+                // This fixes synchronization issues where the CheckBox toggle might be opposite to the intended logic.
+                checkBox.IsChecked = targetState;
 
                 foreach (var file in filesInGroup)
                 {
@@ -184,7 +186,6 @@ namespace FileMerger.ViewModels
             }
 
             PreviewContent = sb.ToString();
-            // Deselect specific file so the main text box shows the merge result
             SelectedFile = null;
         }
 
