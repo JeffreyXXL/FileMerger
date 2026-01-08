@@ -1,0 +1,103 @@
+﻿<Window x:Class="FileMerger.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:FileMerger.ViewModels"
+        mc:Ignorable="d"
+        Title="File Merger Pro" Height="600" Width="900"
+        Background="#F3F4F6">
+
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar / File List -->
+        <Border Grid.Column="0" Background="White" BorderBrush="#E5E7EB" BorderThickness="0,0,1,0">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- Actions -->
+                <Button Command="{Binding ScanCommand}" Content="Scan Folder" Height="35" Margin="0,0,0,10" Background="#3B82F6" Foreground="White" FontWeight="Bold" />
+
+                <CheckBox Grid.Row="1" IsChecked="{Binding GroupByType}" Content="Group by Extension" Margin="0,0,0,10" />
+
+                <!-- File List -->
+                <ListBox Grid.Row="2" ItemsSource="{Binding FilesView}" SelectedItem="{Binding SelectedFile}" SelectionMode="Single">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                                        <!-- Group Header Checkbox -->
+                                        <!-- Binds to the Window DataContext because GroupItem context is CollectionViewGroup -->
+                                        <CheckBox Content="{Binding Name}" 
+                                                  Command="{Binding DataContext.ToggleGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  CommandParameter="{Binding Name}"
+                                                  FontWeight="Bold" 
+                                                  Foreground="#4B5563" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="15,0,0,0">
+                                <CheckBox IsChecked="{Binding IsSelected}" Margin="0,0,8,0" />
+                                <TextBlock Text="{Binding Name}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Status -->
+                <StackPanel Grid.Row="3" Margin="0,10,0,0">
+                    <TextBlock Text="{Binding Files.Count, StringFormat='Total Files: {0}'}" Foreground="Gray" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main Content / Preview -->
+        <Grid Grid.Column="1" Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
+                <Button Command="{Binding MergeCommand}" Content="Merge Selected" Padding="15,8" Margin="0,0,10,0" Background="#10B981" Foreground="White" BorderThickness="0" />
+                <Button Command="{Binding ExportCommand}" Content="Export Result" Padding="15,8" Background="#6366F1" Foreground="White" BorderThickness="0" />
+            </StackPanel>
+
+            <Border Grid.Row="1" BorderBrush="#D1D5DB" BorderThickness="1" Background="White">
+                <ScrollViewer>
+                    <TextBox Text="{Binding PreviewContent}" 
+                             IsReadOnly="True" 
+                             FontFamily="Consolas" 
+                             AcceptsReturn="True" 
+                             BorderThickness="0" 
+                             Padding="10" />
+                </ScrollViewer>
+            </Border>
+
+            <ProgressBar Grid.Row="2" Height="4" IsIndeterminate="True" Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,10,0,0"/>
+        </Grid>
+    </Grid>
+</Window>
